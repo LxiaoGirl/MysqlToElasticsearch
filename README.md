@@ -4,6 +4,13 @@
 # 用法（usage）
 所有的配置都在/common/config.py中，完整配置即可运行。
 
+# Python库要求
+python 2.7.*  
+MysqlDB  
+windows下需要安装包，X64位官方没有版本，可参考http://www.codegood.com/archives/129。
+elasticsearch  
+pip install elasticsearch  
+
 # 配置样例
 DATABASES = [{
     "es_colony": ["http://192.168.198.1:9200"],
