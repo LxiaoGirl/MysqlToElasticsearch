@@ -12,27 +12,27 @@ elasticsearch
 pip install elasticsearch  
 
 # 配置样例
-DATABASES = [{
-    "es_colony": ["http://192.168.198.1:9200"],
-    "db_host": "192.168.1.1",
-    "db_user": "root",
-    "db_pass": "root",
-    "db_port": 3306,
-    "db_name": ["test","mysql"],
-    "db_charset": "utf8",
-    "index": "website",
-    "doc_type": "url",
-    "sql": "SELECT * FROM website"},
-{
-    "es_colony": ["http://192.168.198.1:9200"],
-    "db_host": "192.168.1.3",
-    "db_user": "root",
-    "db_pass": "root",
-    "db_port": 3306,
-    "db_name": ["test","zhensan","sisi"],
-    "db_charset": "utf8",
-    "index": "website",
-    "doc_type": "url",
-    "sql": "SELECT * FROM website"}]
+DATABASES = [{  
+    "es_colony": ["http://192.168.198.1:9200"],  
+    "db_host": "192.168.1.1",  
+    "db_user": "root",  
+    "db_pass": "root",  
+    "db_port": 3306,  
+    "db_name": ["test","mysql"],  
+    "db_charset": "utf8",  
+    "index": "website",  
+    "doc_type": "url",  
+    "sql": "SELECT * FROM website"},  
+{  
+    "es_colony": ["http://192.168.198.1:9200"],  
+    "db_host": "192.168.1.3",  
+    "db_user": "root",  
+    "db_pass": "root",  
+    "db_port": 3306,  
+    "db_name": ["test","zhensan","sisi"],  
+    "db_charset": "utf8",  
+    "index": "website",  
+    "doc_type": "url",  
+    "sql": "SELECT * FROM website"}]  
     
 其中保证es_colony、db_name为list类型，db_port为int类型，其余是str类型。数据库配置错误程序会直接报错停止运行。
