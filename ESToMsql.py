@@ -4,10 +4,10 @@
 @author: xiaoL-pkav l@pker.in
 @version: 2015/8/27 14:27
 """
-
 from elasticsearch import Elasticsearch, helpers
 
 from libs.MysqlDrive import MysqlDrive
+from common.logger import ES_LOGGER
 from common.config import DATABASES
 
 
@@ -32,23 +32,32 @@ def check_es_status(elastic_search, es_colony):
 
 #  __init__(self, db_host, db_user, db_pass, db_name, db_port, charset):
 def init_database(db_host, db_user, db_pass, db_name, db_port, db_charset):
-    print "Connect to %s db: %s" % (db_host, db_name)
+    ES_LOGGER.info("Connect to %s db: %s" % (db_host, db_name))
     return MysqlDrive(db_host, db_user, db_pass, db_name, db_port, db_charset)
+
 
 
 def start_import():
     for dbs in DATABASES:
         if isinstance(dbs['db_name'], list):
             for db_name in dbs['db_name']:
+                db_table = dbs['db_tables']
                 db_connect = init_database(dbs['db_host'], dbs['db_user'], dbs['db_pass'], db_name, dbs['db_port'],
                                            dbs['db_charset'])
                 es = Elasticsearch(dbs['es_colony'])
                 size = 500
                 offset = 0
 
+                count_sql = "SELECT COUNT(*) as `line` FROM %s" % db_table
+                count_num = list(db_connect.query(count_sql, []).select())
+                if len(count_num):
+                    count_num = count_num[0]['line']
+                else:
+                    break
+
                 while True:
                     temp_sql = "%s LIMIT %d,%d" % (dbs['sql'], offset, size)
-                    print "DB: %s LIMIT %d,%d" % (db_name, offset, size)
+                    print "\rDB: %s TABLE: %s Count: %s LIMIT %d,%d" % (db_name, db_table, count_num, offset, size),
                     result_lines = list(db_connect.query(temp_sql, []).select())
                     if len(result_lines):
                         bulks = []
@@ -62,17 +71,17 @@ def start_import():
                         if status is False:
                             print "ES LOST"
                             break
-
                         try:
                             bulk_status = helpers.bulk(es, bulks)[0]
-                            print bulk_status
                         except Exception, e:
                             print e
                         offset += 500
                     else:
-                        print "Index %s Finish" % db_name
+                        print("\r")
+                        ES_LOGGER.info("Index DB: %s TABLES: %s Finish" % (db_name, db_table))
                         break
 
 
 if __name__ == '__main__':
     start_import()
+
