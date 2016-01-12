@@ -12,33 +12,37 @@ elasticsearch
 pip install elasticsearch  
 
 # 配置样例
-DATABASES = [{  
-    "es_colony": ["http://192.168.1.1:6200"],  
-    "db_host": "192.168.1.1",  
-    "db_user": "root",  
-    "db_pass": "root",  
-    "db_port": 3306,  
-    "db_name": ["mysql"],  
-    "db_tables": "website",  
-    "db_charset": "utf8",  
-    "index": "index_test",  
-    "doc_type": "type_test",  
-    # 自增主键（例Id） | 'LIMIT'方式（较慢）"index_type": "数字主键" | "index_type": "limit",  
-    "index_type": "Id",  
-    "sql": "SELECT * FROM website "},  
-    {  
-    "es_colony": ["http://192.168.1.1:6200"],  
-    "db_host": "192.168.1.2",  
-    "db_user": "root",  
-    "db_pass": "root",  
-    "db_port": 3306,  
-    "db_name": ["mysql"],  
-    "db_tables": "website",  
-    "db_charset": "utf8",  
-    "index": "index_test",  
-    "doc_type": "type_test",  
-    # 自增主键（例Id） | 'LIMIT'方式（较慢）"index_type": "数字主键" | "index_type": "limit",  
-    "index_type": "Id",  
-    "sql": "SELECT * FROM website "}]  
+# 导入数据库集合
+DATABASES = [{
+    "es_colony": ["http://192.168.1.188:9200"],
+    "db_host": "192.168.1.201",
+    "db_user": "root",
+    "db_pass": "root",
+    "db_port": 3306,
+    "db_name": ["cf"],
+    "db_charset": "utf8",
+    "index": "test",
+    "doc_type": "website",
+    "doc_field":['ip', 'port', 'site', 'url', 'banner', 'os', 'server', 'script', 'charset', 'title'],
+    # 使用流式数据库读取，尽量缩小内存使用量
+    "sql": "SELECT `IP` AS `ip`,`Port` AS `port`,`URL` AS `site`,`URL` AS `url`,`Banner` AS `banner`,`OS` AS `os`,"
+           "`Server` AS `server`,`Script_Type` AS `script`,`Charset` AS `charset`,`Title` AS `title` FROM website"}]
+    # ,{
+    # "es_colony": ["http://192.168.1.188:9200"],
+    # "db_host": "192.168.1.201",
+    # "db_user": "root",
+    # "db_pass": "root",
+    # "db_port": 3306,
+    # "db_name": ["cf"],
+    # "db_charset": "utf8",
+    # "index": "test",
+    # "doc_type": "website",
+    # "doc_field":['ip', 'port', 'site', 'url', 'banner', 'os', 'server', 'script', 'charset', 'title'],
+    # # 使用流式数据库读取，尽量缩小内存使用量
+    # "sql": "SELECT `IP` AS `ip`,`Port` AS `port`,`URL` AS `site`,`URL` AS `url`,`Banner` AS `banner`,`OS` AS `os`,"
+    #        "`Server` AS `server`,`Script_Type` AS `script`,`Charset` AS `charset`,`Title` AS `title` FROM website"}] 
     
 其中保证es_colony、db_name为list类型，db_port为int类型，其余是str类型。数据库配置错误程序会直接报错停止运行。  
+
+# 说明
+根据个人的服务器配置信息，修改common.py文件中的bulk上传限制跟queue队列大小。服务器性能偏低尽量调小两个参数，比如1000|20000。
