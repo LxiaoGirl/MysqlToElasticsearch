@@ -4,198 +4,87 @@
 @author: xiaoL-pkav l@pker.in
 @version: 2015/8/27 14:27
 """
-from time import time
-from multiprocessing import Pool, Manager, cpu_count
+from time import sleep
+from multiprocessing import Pool as ProcessPool, Manager, cpu_count
 
 from elasticsearch import Elasticsearch, helpers
 
 from libs.MysqlDrive import MysqlDrive
 from common.logger import ES_LOGGER
-from common.config import DATABASES, ES_COLONY
-from common.common import ES_TEST_INDEX, ES_TEST_TYPE, ES_TEST_DOC, UPLOAD_BYTE, QUEUE_LENGTH, OFFSET_LEN
-from datetime import datetime
+from common.config import DATABASES
+from common.common import QUEUE_LENGTH, BULK_LENGTH, THREAD_NUMBER
 
 
-def check_es_status(elastic_search, es_colony):
-    retry = 0
-    try:
-        es_status = elastic_search.info()
-        if es_status['status'] == 200:
-            return True, elastic_search
-    except Exception, e:
-        print e
-        while retry <= 3:
-            try:
-                elastic_search = Elasticsearch(es_colony)
-                print "ES_CONNECT restart!"
-                return True, elastic_search
-            except Exception, e:
-                print e
-            retry += 1
-    return False, ''
-
-
-#  __init__(self, db_host, db_user, db_pass, db_name, db_port, charset):
 def init_database(db_host, db_user, db_pass, db_name, db_port, db_charset):
     ES_LOGGER.info("Connect to %s db: %s" % (db_host, db_name))
     return MysqlDrive(db_host, db_user, db_pass, db_name, db_port, db_charset)
 
 
-def count_byte(data_list):
-    length = 0
-    if isinstance(data_list, dict):
-        for data in data_list:
-            # datetime 特殊处理
-            if isinstance(data_list[data], datetime):
-                length += 20
-            else:
-                length += len(data_list[data])
-    return length
-
-
-def test_performance():
-    es_test = Elasticsearch(ES_COLONY)
-    es_test_doc_length = len(ES_TEST_DOC["test"])
-    bulks = [{
-        "_index": ES_TEST_INDEX,
-        "_type": ES_TEST_TYPE,
-        "_source": ES_TEST_DOC}]
-    for r in range(0, 9):
-        bulks.extend(bulks)
-        es_test_doc_length *= 2
-
-    add_bulk = [{
-        "_index": ES_TEST_INDEX,
-        "_type": ES_TEST_TYPE,
-        "_source": ES_TEST_DOC}]
-    for r in range(0, 9):
-        add_bulk.extend(add_bulk)
-
-    now_rate = 100
-    now_size = es_test_doc_length
-    for test_time in range(1, 40):
-        temp_bulk = add_bulk
-        start_time = time()
-        bulk_num = helpers.bulk(es_test, bulks)
-        size = es_test_doc_length/1024*test_time
-        use_time = time()-start_time
-        now_rate, now_size = calculate_time(use_time, size, now_rate, now_size)
-        if int(use_time) > 2:
-            break
-        print("\rBulks number: %d, param size: %d KB, use time: %f,now siez: %d KB, time/size: %f" %
-              (bulk_num[0], size, use_time, now_size, now_rate)),
-        bulks.extend(temp_bulk)
-    print("\r")
-    ES_LOGGER.info("Best size: %d KB" % now_size)
-
-
-def calculate_time(use_time, size, now_rate, now_size):
-    if int(use_time) <= 2:
-        return use_time/size, size
-
-    temp_rate = use_time/size
-    if temp_rate > now_rate:
-        return now_rate, now_size
-    else:
-        return temp_rate, size
-
-
 def bulk_elasticsearch(r_queue, dbs, db_name):
+    ES_LOGGER.info("Bulk Host: %s DB: %s Start" % (dbs['db_host'], db_name))
     es = Elasticsearch(dbs['es_colony'], retry_on_timeout=True, max_retries=3)
-    db_table = dbs['db_tables']
     flag = True
-    content_length = 0
     bulks = []
+
+    bulk_length = 0
     while flag:
         while not r_queue.empty():
             data = r_queue.get()
-            # print data
             if isinstance(data, str) and data == 'False':
-                flag = False
-                break
-
-            count_length = count_byte(data)
-            content_length = content_length + count_length
-
-            if content_length <= UPLOAD_BYTE:
-                bulks.append({
-                    "_index": dbs['index'],
-                    "_type": dbs['doc_type'],
-                    "_source": data
-                })
-            else:
                 try:
-                    helpers.bulk(es, bulks)
+                    ES_LOGGER.info("Bulk Host: %s DB: %s Data: %s" % (dbs['db_host'], db_name, bulk_length))
+                    streaming_bulks = helpers.streaming_bulk(es, bulks)
+                    for streaming_bulk in streaming_bulks:
+                        if streaming_bulk[0]:
+                            print "Bulk Id: %s\r" % streaming_bulk[1]['create']['_id'],
+                    bulks = []
                 except Exception, e:
                     ES_LOGGER.warning(e)
-                bulks = [{
-                    "_index": dbs['index'],
-                    "_type": dbs['doc_type'],
-                    "_source": data
-                }]
-                content_length = count_length
-                # status, es = check_es_status(es, dbs['es_colony'])
-    try:
-        helpers.bulk(es, bulks)
-    except Exception, e:
-        ES_LOGGER.warning(e)
-    ES_LOGGER.info("Index DB: %s TABLES: %s Finish" % (db_name, db_table))
+                flag = False
+                break
+            bulks.append({
+                "_index": dbs['index'],
+                "_type": dbs['doc_type'],
+                "_source": data
+            })
+            bulk_length += 1
+            if bulk_length >= BULK_LENGTH:
+                try:
+                    ES_LOGGER.info("Bulk Host: %s DB: %s Data: %s" % (dbs['db_host'], db_name, bulk_length))
+                    streaming_bulks = helpers.streaming_bulk(es, bulks)
+                    for streaming_bulk in streaming_bulks:
+                        if streaming_bulk[0]:
+                            print "Bulk Id: %s\r" % streaming_bulk[1]['create']['_id'],
+                    bulks = []
+                except Exception, e:
+                    ES_LOGGER.warning(e)
+                bulk_length = 0
+        ES_LOGGER.info("Queue is empty. Sleep 5 ")
+        sleep(5)
+    ES_LOGGER.info("Bulk Host: %s DB: %s Finish" % (dbs['db_host'], db_name))
 
 
 def write_database(w_queue, w_lock, dbs, db_name):
-    db_table = dbs['db_tables']
+    ES_LOGGER.info("Index Host: %s DB: %s Start" % (dbs['db_host'], db_name))
     db_connect = init_database(dbs['db_host'], dbs['db_user'], dbs['db_pass'], db_name, dbs['db_port'],
                                dbs['db_charset'])
+    data_lines_number = 0
+    for result_lines in db_connect.query(dbs['sql'], []).stream_result():
+        while w_queue.full() or w_queue.qsize()+1000 > QUEUE_LENGTH:
+            ES_LOGGER.info("Queue is full. Sleep 20 ")
+            sleep(20)
+        for result in result_lines:
+            bulk_list = dict(zip(dbs['doc_field'], list(result)))
+            w_queue.put(bulk_list)
+        data_lines_number += len(result_lines)
+        print "Index Host: %s DB: %s Data: %s\r" % (dbs['db_host'], db_name, data_lines_number),
 
-    size = OFFSET_LEN
-    offset = 0
+    thread_num = THREAD_NUMBER
+    while thread_num > 0:
+        w_queue.put("False")
+        thread_num -= 1
 
-    # 计算数据总数
-    count_sql = "SELECT COUNT(*) as `line` FROM %s" % db_table
-    count_num = list(db_connect.query(count_sql, []).select())
-    if len(count_num):
-        count_num = count_num[0]['line']
-
-    if dbs['index_type'] == 'limit':
-        while True:
-            temp_sql = "%s LIMIT %d,%d" % (dbs['sql'], offset, size)
-            print "\rDB: %s Table: %s Count: %s Limit %d , %d" % (db_name, db_table, count_num, offset, size),
-            result_lines = list(db_connect.query(temp_sql, []).select())
-            if len(result_lines):
-                w_lock.acquire()
-                for result in result_lines:
-                    w_queue.put(result)
-                w_lock.release()
-                offset += size
-            else:
-                w_lock.acquire()
-                w_queue.put("False")
-                w_lock.release()
-                break
-    else:
-        primary_key = dbs['index_type']
-        min_sql = "SELECT MIN(%s) as min FROM %s" % (primary_key, db_table)
-        max_sql = "SELECT MAX(%s) as max FROM %s" % (primary_key, db_table)
-        min_id = list(db_connect.query(min_sql, []).select())[0]['min']
-        max_id = list(db_connect.query(max_sql, []).select())[0]['max']
-        offset = min_id
-        while True:
-            limit_size = offset + size
-            temp_sql = "%s where %s >= %d and %s <= %d" % (dbs['sql'], primary_key, offset, primary_key, limit_size)
-            print "\rDB: %s Table: %s Count: %s Key From: %d - %d" % (db_name, db_table, count_num, offset, limit_size)
-            result_lines = list(db_connect.query(temp_sql, []).select())
-            if len(result_lines):
-                w_lock.acquire()
-                for result in result_lines:
-                    w_queue.put(result)
-                w_lock.release()
-                offset += size
-            elif offset+size >= max_id:
-                w_lock.acquire()
-                w_queue.put("False")
-                w_lock.release()
-                break
-    print("\r")
+    ES_LOGGER.info("Index Host: %s DB: %s Finish" % (dbs['db_host'], db_name))
 
 
 def main():
@@ -203,7 +92,7 @@ def main():
     common_queue = managers.Queue(QUEUE_LENGTH)
 
     common_lock = managers.Lock()
-    process_pool = Pool(cpu_count())
+    process_pool = ProcessPool(cpu_count()*2)
 
     for dbs in DATABASES:
         if isinstance(dbs['db_name'], list):

@@ -15,7 +15,7 @@ from common import LOG_DOC
 
 from thirdparty.ansistrm.ansistrm import ColorizingStreamHandler
 
-FORMATTER = logging.Formatter('\r%(asctime)s [%(name)s][%(levelname)s] %(message)s', '%Y-%m-%d %H:%M:%S')
+FORMATTER = logging.Formatter('%(asctime)s [%(name)s][%(levelname)s] %(message)s', '%Y-%m-%d %H:%M:%S')
 COLOR_LOGGER_HANDLER = ColorizingStreamHandler(sys.stdout)
 COLOR_LOGGER_HANDLER.setFormatter(FORMATTER)
 
@@ -35,6 +35,10 @@ def init_logger():
 
 class MyLogger(logging.getLoggerClass()):
     def __init__(self, name):
+        """
+
+        :rtype : object
+        """
         super(MyLogger, self).__init__(self)
         self.name = name
         self.addHandler(LOCAL_LOGGER_HANDLER)

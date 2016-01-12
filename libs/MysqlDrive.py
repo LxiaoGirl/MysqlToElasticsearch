@@ -6,7 +6,8 @@
 """
 
 import MySQLdb
-import logging
+import MySQLdb.cursors
+from common.logger import ES_LOGGER
 
 
 class MysqlDrive():
@@ -16,11 +17,12 @@ class MysqlDrive():
         self.DB_CURSOR = None
         self.DB_ARGS = None
         try:
-            self.DB_CONNECT = MySQLdb.connect(db_host, db_user, db_pass, db_name, db_port, charset=charset)
-            self.DB_CURSOR = self.DB_CONNECT.cursor(MySQLdb.cursors.DictCursor)
+            self.DB_CONNECT = MySQLdb.connect(db_host, db_user, db_pass, db_name, db_port, charset=charset,
+                                              cursorclass=MySQLdb.cursors.SSCursor, connect_timeout=9999999)
+            self.DB_CURSOR = self.DB_CONNECT.cursor()
+            # MySQLdb.cursors.DictCursor 使用MySQLdb.cursors.SSCursor 无法直接返回字典序
         except Exception, e:
-            print e
-            logging.debug("数据库连接错误：%s " % e)
+            ES_LOGGER.debug("数据库连接错误：%s " % e)
 
     def query(self, query, value):
         self.DB_QUERY = query
@@ -29,12 +31,12 @@ class MysqlDrive():
 
     def execute_query(self):
         if self.DB_QUERY is None:
-            logging.debug("请输入SQL语句")
+            ES_LOGGER.warning("数据库语句空缺")
         try:
             self.DB_CURSOR.execute(self.DB_QUERY, self.DB_ARGS)
         except Exception, e:
             self.DB_CONNECT.rollback()
-            logging.debug("数据库执行错误 %s" % e)
+            ES_LOGGER.debug("数据库执行错误：%s " % e)
 
     def format_data(self):
         results = self.DB_CURSOR.fetchall()
@@ -46,11 +48,26 @@ class MysqlDrive():
             self.DB_CONNECT.commit()
             return self.DB_CURSOR.rowcount
         except Exception, e:
-            logging.debug("CURD 错误：%s" % e)
+            ES_LOGGER.debug("CURD 错误：%s" % e)
 
     def select(self):
         self.execute_query()
         return self.format_data()
+
+    def stream_result(self, line=1000):
+        self.execute_query()
+        return self.stream_data(line)
+
+    def stream_data(self, line=1000):
+        try:
+            while True:
+                rows = self.DB_CURSOR.fetchmany(size=1000)
+                if not rows:
+                    break
+                else:
+                    yield rows
+        except Exception, e:
+            print e
 
     def reinitialize(self):
         self.DB_QUERY = None
