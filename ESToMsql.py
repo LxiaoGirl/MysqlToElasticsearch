@@ -4,6 +4,7 @@
 @author: xiaoL-pkav l@pker.in
 @version: 2015/8/27 14:27
 """
+import sys
 from time import sleep
 from multiprocessing import Pool as ProcessPool, Manager, cpu_count
 
@@ -13,6 +14,9 @@ from libs.MysqlDrive import MysqlDrive
 from common.logger import ES_LOGGER
 from common.config import DATABASES
 from common.common import QUEUE_LENGTH, BULK_LENGTH, THREAD_NUMBER
+
+reload(sys)
+sys.setdefaultencoding('utf-8')
 
 
 def init_database(db_host, db_user, db_pass, db_name, db_port, db_charset):
