@@ -18,7 +18,7 @@ class MysqlDrive():
         self.DB_ARGS = None
         try:
             self.DB_CONNECT = MySQLdb.connect(db_host, db_user, db_pass, db_name, db_port, charset=charset,
-                                              cursorclass=MySQLdb.cursors.SSCursor, connect_timeout=9999999)
+                                              cursorclass=MySQLdb.cursors.SSCursor, connect_timeout=3600)
             self.DB_CURSOR = self.DB_CONNECT.cursor()
             # MySQLdb.cursors.DictCursor 使用MySQLdb.cursors.SSCursor 无法直接返回字典序
         except Exception, e:

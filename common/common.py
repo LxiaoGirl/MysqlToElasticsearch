@@ -14,8 +14,5 @@ BULK_LENGTH = 10000
 # 队列长度
 QUEUE_LENGTH = 200000
 
-# 进程数
-PROCESS_NUMBER = 6
-
-# 线程数
-THREAD_NUMBER = 4
+# 数据库流式取条数
+SQL_NUMBER = 1000
