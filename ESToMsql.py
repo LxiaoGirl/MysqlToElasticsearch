@@ -106,6 +106,7 @@ def main():
     map_dba = []
     map_db_name = []
     process_pool = ProcessPool(cpu_count())
+
     for dbs in DATABASES:
         if isinstance(dbs['db_name'], list):
             for db_name in dbs['db_name']:

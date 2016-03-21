@@ -11,7 +11,7 @@ import sys
 import os
 import time
 
-from common import LOG_DOC
+from common import LOG_DOC # 目录
 
 from thirdparty.ansistrm.ansistrm import ColorizingStreamHandler
 
