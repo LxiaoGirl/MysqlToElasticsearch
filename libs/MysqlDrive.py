@@ -54,20 +54,20 @@ class MysqlDrive():
         self.execute_query()
         return self.format_data()
 
-    def stream_result(self, line=1000):
+    def stream_result(self, line):
         self.execute_query()
         return self.stream_data(line)
 
-    def stream_data(self, line=1000):
+    def stream_data(self, line):
         try:
             while True:
-                rows = self.DB_CURSOR.fetchmany(size=1000)
+                rows = self.DB_CURSOR.fetchmany(size=line)
                 if not rows:
                     break
                 else:
                     yield rows
         except Exception, e:
-            print e
+            ES_LOGGER.debug("数据读取错误：%s" % e)
 
     def reinitialize(self):
         self.DB_QUERY = None

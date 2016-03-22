@@ -30,20 +30,19 @@ def bulk_elasticsearch(r_queue, dbs, db_name):
     es = Elasticsearch(dbs['es_colony'], retry_on_timeout=True, max_retries=3, timeout=360)
     flag = True
     bulks = []
-
+    data_lines_number = 0
     bulk_length = 0
     while flag:
         while not r_queue.empty():
-            data_lines_number = 0
             data = r_queue.get()
             data_lines_number += 1
             if isinstance(data, str) and data == 'False':
                 try:
                     ES_LOGGER.info("Bulk Host: %s DB: %s Data: %s" % (dbs['db_host'], db_name, bulk_length))
-                    streaming_bulks = helpers.streaming_bulk(es, bulks)
+                    streaming_bulks = helpers.streaming_bulk(es, bulks, chunk_size=len(bulks))
                     for streaming_bulk in streaming_bulks:
                         if streaming_bulk[0]:
-                            print "Bulk Id: %s\r" % streaming_bulk[1]['create']['_id'],
+                            pass
                     bulks = []
                 except Exception, e:
                     ES_LOGGER.warning(e)
@@ -57,17 +56,17 @@ def bulk_elasticsearch(r_queue, dbs, db_name):
             bulk_length += 1
             if bulk_length >= BULK_LENGTH:
                 try:
-                    print "Bulk Host: %s DB: %s Data: %s\r" % (dbs['db_host'], db_name, data_lines_number),
-                    streaming_bulks = helpers.streaming_bulk(es, bulks)
+                    ES_LOGGER.info("Bulk Host: %s DB: %s Data: %s" % (dbs['db_host'], db_name, data_lines_number),)
+                    streaming_bulks = helpers.streaming_bulk(es, bulks, chunk_size=len(bulks))
                     for streaming_bulk in streaming_bulks:
                         if streaming_bulk[0]:
-                            print "Bulk Id: %s\r" % streaming_bulk[1]['create']['_id'],
+                            pass
                     bulks = []
                     bulk_length = 0
                 except Exception, e:
                     ES_LOGGER.warning(e)
-        ES_LOGGER.info("Queue is empty. Sleep 5 ")
-        sleep(5)
+        ES_LOGGER.info("Queue is empty. Sleep 10")
+        sleep(10)
     ES_LOGGER.info("Bulk Host: %s DB: %s Finish! Data: %s" % (dbs['db_host'], db_name, data_lines_number))
 
 
@@ -77,17 +76,18 @@ def write_database(w_queue, dbs, db_name):
                                dbs['db_charset'])
     data_lines_number = 0
     for result_lines in db_connect.query(dbs['sql'], []).stream_result(line=SQL_NUMBER):
-        while w_queue.full() or w_queue.qsize()+1000 > QUEUE_LENGTH:
+        while w_queue.full() or w_queue.qsize()+SQL_NUMBER > QUEUE_LENGTH:
             ES_LOGGER.info("Queue is full. Sleep 20")
             sleep(20)
         for result in result_lines:
             bulk_list = dict(zip(dbs['doc_field'], list(result)))
             w_queue.put(bulk_list)
         data_lines_number += len(result_lines)
-        print "Index Host: %s DB: %s Data: %s\r" % (dbs['db_host'], db_name, data_lines_number),
+        ES_LOGGER.info("Index Host: %s DB: %s Data: %s" % (dbs['db_host'], db_name, data_lines_number),)
 
     w_queue.put("False")
     ES_LOGGER.info("Index Host: %s DB: %s Finish! Data: %s" % (dbs['db_host'], db_name, data_lines_number))
+    db_connect.release()
 
 
 def main_process((w_queue, dbs, db_name)):
@@ -107,17 +107,20 @@ def main():
     map_db_name = []
     process_pool = ProcessPool(cpu_count())
 
-    for dbs in DATABASES:
-        if isinstance(dbs['db_name'], list):
-            for db_name in dbs['db_name']:
-                managers = Manager()
-                map_dba.append(dbs)
-                map_queue.append(managers.Queue(QUEUE_LENGTH))
-                map_db_name.append(db_name)
-    process_pool.map_async(main_process, map(lambda queue, dba, name: (queue, dba, name), map_queue, map_dba, map_db_name))
+    try:
+        for dbs in DATABASES:
+            if isinstance(dbs['db_name'], list):
+                for db_name in dbs['db_name']:
+                    managers = Manager()
+                    map_dba.append(dbs)
+                    map_queue.append(managers.Queue(QUEUE_LENGTH))
+                    map_db_name.append(db_name)
+        process_pool.map_async(main_process, map(lambda queue, dba, name: (queue, dba, name), map_queue, map_dba, map_db_name))
 
-    process_pool.close()
-    process_pool.join()
+        process_pool.close()
+        process_pool.join()
+    except Exception, e:
+        ES_LOGGER.error("BIG ERROR! %s",e)
 
 
 if __name__ == '__main__':
