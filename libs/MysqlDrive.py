@@ -63,7 +63,7 @@ class MysqlDrive():
             while True:
                 rows = self.DB_CURSOR.fetchmany(size=line)
                 if not rows:
-                    self.release()
+                   #self.release()
                     yield []
                 else:
                     yield rows

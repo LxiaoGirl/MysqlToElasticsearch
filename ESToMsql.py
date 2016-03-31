@@ -152,18 +152,19 @@ def emergency_process(w_queue, w_lock, dbs, db_name, data_lines_number):
 
 
 def main():
-    process_pool = ProcessPool(len(DATABASES)*2)
+
     try:
         for dbs in DATABASES:
             if isinstance(dbs['db_name'], list):
                 for db_name in dbs['db_name']:
+                    process_pool = ProcessPool(2)
                     managers = Manager()
                     w_queue = managers.Queue(QUEUE_LENGTH)
                     w_lock = managers.Lock()
                     process_pool.apply_async(write_database, args=(w_queue, w_lock, dbs, db_name))
                     process_pool.apply_async(bulk_elasticsearch, args=(w_queue, w_lock, dbs, db_name))
-        process_pool.close()
-        process_pool.join()
+                    process_pool.close()
+                    process_pool.join()
     except Exception, e:
         ES_LOGGER.error("BIG ERROR! %s",e)
 
