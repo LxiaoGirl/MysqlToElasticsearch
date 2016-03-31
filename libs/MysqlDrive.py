@@ -18,7 +18,7 @@ class MysqlDrive():
         self.DB_ARGS = None
         try:
             self.DB_CONNECT = MySQLdb.connect(db_host, db_user, db_pass, db_name, db_port, charset=charset,
-                                              cursorclass=MySQLdb.cursors.SSCursor, connect_timeout=3600)
+                                              cursorclass=MySQLdb.cursors.SSCursor, connect_timeout=36000000)
             self.DB_CURSOR = self.DB_CONNECT.cursor()
             # MySQLdb.cursors.DictCursor 使用MySQLdb.cursors.SSCursor 无法直接返回字典序
         except Exception, e:
@@ -63,11 +63,13 @@ class MysqlDrive():
             while True:
                 rows = self.DB_CURSOR.fetchmany(size=line)
                 if not rows:
-                    break
+                    self.release()
+                    yield []
                 else:
                     yield rows
         except Exception, e:
-            ES_LOGGER.debug("数据读取错误：%s" % e)
+            ES_LOGGER.debug("数据读取错误，正在重新连接：%s" % e)
+            yield 'Exception'
 
     def reinitialize(self):
         self.DB_QUERY = None

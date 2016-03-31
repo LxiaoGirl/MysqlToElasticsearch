@@ -12,7 +12,8 @@ LOG_DOC = 'log'
 BULK_LENGTH = 500
 
 # 队列长度
-QUEUE_LENGTH = 500000
+QUEUE_LENGTH = 200000
 
 # 数据库流式取条数
 SQL_NUMBER = 2000
+
